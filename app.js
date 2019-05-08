@@ -74,6 +74,6 @@ app.get("/stop", (req, res, next) => {
     json(res, {'msg': 'Stop'}).unsafePerformIO();
 });
 
-app.listen(3001, () => {
+app.listen(3000, () => {
     console.log("Server running on port 3001");
 });

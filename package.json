@@ -1,11 +1,13 @@
 {
     "name": "node-express-test",
-    "version": "0.0.1.0",
+    "version": "0.0.1",
     "description": "只是一次技术验证",
     "main": "app.js",
-    "scripts": {},
+    "scripts": {
+        "start": "node app.js"
+    },
     "author": "Nouzan",
-    "license": "ISC",
+    "license": "MIT",
     "dependencies": {
         "express": "^4.16.4",
         "folktale": "^2.3.2",
