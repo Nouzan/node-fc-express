@@ -20,6 +20,11 @@ const json = _.curry((res, body) => new IO(() => {
     return parseBody(body);
 }));
 
+// listen :: Listen a => Number -> (() -> undefined) -> a -> IO(undefined)
+const listen = _.curry((port, f, server) => new IO(() => {
+    server.listen(port, f);
+}));
+
 // setTimer :: Number -> (a -> b) -> IO(Number)
 const setTimer = _.curry((interval, f) => new IO(() => setInterval(f, interval)));
 
@@ -27,6 +32,12 @@ const setTimer = _.curry((interval, f) => new IO(() => setInterval(f, interval))
 const clearTimer = timerID => new IO(
     () => {clearInterval(timerID);}
 );
+
+// handleReq :: Method -> URL -> (Request -> Response -> Next -> a) -> Express -> IO(undefined)
+// TODO: Check method and url
+const handleReq = _.curry((method, url, f, app) => new IO(() => {
+    app[method](url, f);
+}));
 
 // get :: a -> Maybe(a)
 const get = Maybe.get;
@@ -53,6 +64,7 @@ const stop = _.compose(_.sequence(IO.of), _.map(stopLoop));
 const app = express();
 
 // print :: a -> IO(undefined)
+
 // loop :: () -> undefined
 const loop = () => {
     tools.print('Hello, World!').unsafePerformIO();
@@ -60,20 +72,31 @@ const loop = () => {
 
 var maybeTimerID = Maybe.Nothing();
 
-app.get("/", (req, res, next) => {
-    json(res, {'msg': "Hello, World"}).unsafePerformIO();
-});
+// app['get']("/", (req, res, next) => {
+//     json(res, {'msg': "Hello, World"}).unsafePerformIO();
+// });
+handleReq('get', '/', (req, res, next) => {
+    json(res, {'msg': 'Hello, Again'}).unsafePerformIO();
+}, app).unsafePerformIO();
 
-app.get("/start", (req, res, next) => {
+// app.get("/start", (req, res, next) => {
+//     maybeTimerID = start(loop)(maybeTimerID).unsafePerformIO();
+//     json(res, {'msg': 'Start'}).unsafePerformIO();
+// });
+handleReq('get', '/start', (req, res, next) => {
     maybeTimerID = start(loop)(maybeTimerID).unsafePerformIO();
     json(res, {'msg': 'Start'}).unsafePerformIO();
-});
+}, app).unsafePerformIO();
 
-app.get("/stop", (req, res, next) => {
+// app.get("/stop", (req, res, next) => {
+//     maybeTimerID = stop(maybeTimerID).unsafePerformIO();
+//     json(res, {'msg': 'Stop'}).unsafePerformIO();
+// });
+handleReq('get', '/stop', (req, res, next) => {
     maybeTimerID = stop(maybeTimerID).unsafePerformIO();
     json(res, {'msg': 'Stop'}).unsafePerformIO();
-});
+}, app).unsafePerformIO();
 
-app.listen(3000, () => {
+listen(3000, () => {
     tools.print('Express listen on 3000').unsafePerformIO();
-});
+}, app).unsafePerformIO();
