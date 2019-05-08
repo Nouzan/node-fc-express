@@ -1,0 +1,14 @@
+{
+    "name": "node-express-test",
+    "version": "0.0.1.0",
+    "description": "只是一次技术验证",
+    "main": "app.js",
+    "scripts": {},
+    "author": "Nouzan",
+    "license": "ISC",
+    "dependencies": {
+        "express": "^4.16.4",
+        "folktale": "^2.3.2",
+        "ramda": "^0.26.1"
+    }
+}
