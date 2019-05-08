@@ -1,9 +1,7 @@
 const _ = require("ramda");
 const express = require("express");
-const { IO, Maybe } = require("./support");
+const { IO, Maybe, tools } = require("./support");
 const { Result, APIError, parseResult, checkJsonBody } = require("./utils");
-
-const app = express();
 
 // Pure Code
 // ====================
@@ -25,7 +23,7 @@ const json = _.curry((res, body) => new IO(() => {
 // setTimer :: Number -> (a -> b) -> IO(Number)
 const setTimer = _.curry((interval, f) => new IO(() => setInterval(f, interval)));
 
-// clearTimer :: Number -> IO(null)
+// clearTimer :: Number -> IO(undefined)
 const clearTimer = timerID => new IO(
     () => {clearInterval(timerID);}
 );
@@ -41,7 +39,7 @@ const orElse = Maybe.orElse;
 // startLoop :: (a -> b) -> IO(Number)
 const startLoop = setTimer(1000);
 
-// stopLoop :: Number -> IO(null)
+// stopLoop :: Number -> IO(undefined)
 const stopLoop = clearTimer;
 
 // start :: (a -> b) -> Maybe(Number) -> IO(Maybe(Number))
@@ -52,10 +50,12 @@ const stop = _.compose(_.sequence(IO.of), _.map(stopLoop));
 
 // Impure Code
 // ====================
+const app = express();
 
+// print :: a -> IO(undefined)
 // loop :: () -> undefined
 const loop = () => {
-    console.log('Hello, Wrold');
+    tools.print('Hello, World!').unsafePerformIO();
 }
 
 var maybeTimerID = Maybe.Nothing();
@@ -75,5 +75,5 @@ app.get("/stop", (req, res, next) => {
 });
 
 app.listen(3000, () => {
-    console.log("Server running on port 3001");
+    tools.print('Express listen on 3000').unsafePerformIO();
 });

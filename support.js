@@ -32,7 +32,16 @@ const orElse = _.curry((f, m) => m.orElse(f));
 Just.prototype.sequence = function(of) { return this.value.map(get) };
 Nothing.prototype.sequence = of => of(Nothing());
 
+// Tools
+// ********************
+
+// print a -> IO(undefined)
+const print = x => new IO(() => console.log(x));
+
 module.exports = {
     IO: IO,
-    Maybe: { Just: Just, Nothing: Nothing, get: get, orElse: orElse}
+    Maybe: { Just: Just, Nothing: Nothing, get: get, orElse: orElse},
+    tools: {
+        print: print
+    }
 }
