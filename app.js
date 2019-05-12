@@ -20,9 +20,10 @@ const json = _.curry((res, body) => new IO(() => {
     return parseBody(body);
 }));
 
-// listen :: Listen a => Number -> (() -> undefined) -> a -> IO(undefined)
+// listen :: Listen a => Number -> (() -> undefined) -> a -> IO(a)
 const listen = _.curry((port, f, server) => new IO(() => {
     server.listen(port, f);
+    return server;
 }));
 
 // setTimer :: Number -> (a -> b) -> IO(Number)
@@ -33,10 +34,13 @@ const clearTimer = timerID => new IO(
     () => {clearInterval(timerID);}
 );
 
-// handleReq :: Method -> URL -> (Request -> Response -> Next -> a) -> Express -> IO(undefined)
+// handleReq :: Express -> Method -> URL -> (Request -> Response -> Next -> a) -> IO(Express)
 // TODO: Check method and url
-const handleReq = _.curry((method, url, f, app) => new IO(() => {
+const handleReq = _.curry((app, method, url, f) => new IO(() => {
+    console.log('setup a route.');
     app[method](url, f);
+    // console.log(app);
+    return app;
 }));
 
 // get :: a -> Maybe(a)
@@ -59,9 +63,11 @@ const start = f => orElse(() => _.map(get, startLoop(f)));
 // stop :: Maybe(Number) -> IO(Nothing)
 const stop = _.compose(_.sequence(IO.of), _.map(stopLoop));
 
-// Impure Code
-// ====================
-const app = express();
+// setRoutes :: Express -> [Route] -> IO [Express]
+const setRoutes = app => _.compose(_.sequence(IO.of), _.map(({ method, url, handler }) => handleReq(app, method, url, handler)));
+
+// runApp :: Express -> Number -> (() -> undefined) -> [Route] -> IO Express
+const runApp = (app, port, f) => _.compose(_.chain(listen(port, f)), _.map(_.last), setRoutes(app));
 
 // print :: a -> IO(undefined)
 
@@ -72,31 +78,33 @@ const loop = () => {
 
 var maybeTimerID = Maybe.Nothing();
 
-// app['get']("/", (req, res, next) => {
-//     json(res, {'msg': "Hello, World"}).unsafePerformIO();
-// });
-handleReq('get', '/', (req, res, next) => {
-    json(res, {'msg': 'Hello, Again'}).unsafePerformIO();
-}, app).unsafePerformIO();
+const routes = [{
+        'method': 'get', 
+        'url': '/', 
+        'handler': (req, res, next) => { json(res, {'msg': 'Hello, Again'}).unsafePerformIO(); }
+    }, {
+        'method': 'get',
+        'url': '/start',
+        'handler': (req, res, next) => {
+            maybeTimerID = start(loop)(maybeTimerID).unsafePerformIO();
+            json(res, {'msg': 'The loop started.'}).unsafePerformIO();
+        }
+    }, {
+        'method': 'get',
+        'url': '/stop',
+        'handler': (req, res, next) => {
+            maybeTimerID = stop(maybeTimerID).unsafePerformIO();
+            json(res, {'msg': 'Stop'}).unsafePerformIO();
+        }
+    }
+];
 
-// app.get("/start", (req, res, next) => {
-//     maybeTimerID = start(loop)(maybeTimerID).unsafePerformIO();
-//     json(res, {'msg': 'Start'}).unsafePerformIO();
-// });
-handleReq('get', '/start', (req, res, next) => {
-    maybeTimerID = start(loop)(maybeTimerID).unsafePerformIO();
-    json(res, {'msg': 'Start'}).unsafePerformIO();
-}, app).unsafePerformIO();
+// Impure Code
+// ====================
 
-// app.get("/stop", (req, res, next) => {
-//     maybeTimerID = stop(maybeTimerID).unsafePerformIO();
-//     json(res, {'msg': 'Stop'}).unsafePerformIO();
-// });
-handleReq('get', '/stop', (req, res, next) => {
-    maybeTimerID = stop(maybeTimerID).unsafePerformIO();
-    json(res, {'msg': 'Stop'}).unsafePerformIO();
-}, app).unsafePerformIO();
+const app = express();
 
-listen(3000, () => {
-    tools.print('Express listen on 3000').unsafePerformIO();
-}, app).unsafePerformIO();
+runApp(app, 3000, () => {
+     tools.print('Express is listening on 3000').unsafePerformIO();
+})(routes).unsafePerformIO();
+

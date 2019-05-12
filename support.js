@@ -9,8 +9,17 @@ class IO {
     constructor(f) {
         this.unsafePerformIO = f;
     }
-    map(f){
+    map(f) {
         return new IO(_.compose(f, this.unsafePerformIO));
+    }
+    ap(other_container) {
+        return this.map(g => g(other_container.unsafePerformIO()));
+    }
+    join() {
+        return this.unsafePerformIO();
+    }
+    chain(f) {
+        return (this.map(f)).join();
     }
 }
 
@@ -35,13 +44,21 @@ Nothing.prototype.sequence = of => of(Nothing());
 // Tools
 // ********************
 
-// print a -> IO(undefined)
+// print :: a -> IO(undefined)
 const print = x => new IO(() => console.log(x));
+
+// Impure
+// debug :: a -> a
+const debug = x => {
+    console.log(x);
+    return x;
+};
 
 module.exports = {
     IO: IO,
     Maybe: { Just: Just, Nothing: Nothing, get: get, orElse: orElse},
     tools: {
-        print: print
+        print: print,
+        debug: debug
     }
 }
