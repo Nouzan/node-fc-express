@@ -13,10 +13,11 @@ class IO {
         return new IO(_.compose(f, this.unsafePerformIO));
     }
     ap(other_container) {
-        return this.map(g => g(other_container.unsafePerformIO()));
+        // return this.map(g => g(other_container.unsafePerformIO()));
+        return this.chain(g => other_container.map(g));
     }
     join() {
-        return this.unsafePerformIO();
+        return new IO(() => this.unsafePerformIO().unsafePerformIO());
     }
     chain(f) {
         return (this.map(f)).join();

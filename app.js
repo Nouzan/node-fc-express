@@ -14,8 +14,8 @@ const { Result, APIError, parseResult, checkJsonBody } = require("./utils");
 // parseBody :: a -> APIJSON
 const parseBody = _.compose(parseResult, checkJsonBody);
 
-// json :: Json a => a -> b -> IO(APIJSON)
-const json = _.curry((res, body) => new IO(() => {
+// json :: Json b => a -> b -> IO(APIJSON)
+const json = _.curry((body, res) => new IO(() => {
     res.json(parseBody(body));
     return parseBody(body);
 }));
@@ -37,7 +37,7 @@ const clearTimer = timerID => new IO(
 // handleReq :: Express -> Method -> URL -> (Request -> Response -> Next -> a) -> IO(Express)
 // TODO: Check method and url
 const handleReq = _.curry((app, method, url, f) => new IO(() => {
-    console.log('setup a route.');
+    console.log(`setup a route at ${ url }`);
     app[method](url, f);
     // console.log(app);
     return app;
@@ -57,54 +57,76 @@ const startLoop = setTimer(1000);
 // stopLoop :: Number -> IO(undefined)
 const stopLoop = clearTimer;
 
-// start :: (a -> b) -> Maybe(Number) -> IO(Maybe(Number))
-const start = f => orElse(() => _.map(get, startLoop(f)));
+// start :: Maybe(Number) -> (a -> b) -> IO(Maybe(Number))
+const start = _.curry((m, f) => m.orElse(() => _.map(get, startLoop(f))));
 
 // stop :: Maybe(Number) -> IO(Nothing)
 const stop = _.compose(_.sequence(IO.of), _.map(stopLoop));
 
 // setRoutes :: Express -> [Route] -> IO [Express]
-const setRoutes = app => _.compose(_.sequence(IO.of), _.map(({ method, url, handler }) => handleReq(app, method, url, handler)));
+const setRoutes = app => _.compose(_.sequence(IO.of), _.map(({ method, url, io_handler }) => io_handler.chain(handleReq(app, method, url))));
 
-// runApp :: Express -> Number -> (() -> undefined) -> [Route] -> IO Express
-const runApp = (app, port, f) => _.compose(_.chain(listen(port, f)), _.map(_.last), setRoutes(app));
+// runApp :: Express -> Number -> [Route] -> (() -> undefined) -> IO Express
+const runApp = _.curry((app, port, routes, f) => _.compose(_.chain(listen(port, f)), _.map(_.last), setRoutes(app))(routes));
 
-// print :: a -> IO(undefined)
+// closureIO :: IO(a) -> IO(() -> a)
+const closureIO = io => IO.of(() => io.unsafePerformIO());
 
-// loop :: () -> undefined
-const loop = () => {
-    tools.print('Hello, World!').unsafePerformIO();
-}
+// res2FullIO :: (Response -> IO(a)) -> IO(Request -> Response -> Next -> a)
+const res2FullIO = f => IO.of((req, res, next) => f(res).unsafePerformIO());
 
+// tools.print :: a -> IO(undefined)
+// io_loop :: IO(() -> undefined)
+const io_loop = closureIO(tools.print('Looping'));
+
+// maybeTimerID :: Maybe
 var maybeTimerID = Maybe.Nothing();
+
+// getMaybeTimerID :: () -> IO(undefined)
+const getMaybeTimerID = () => IO.of(maybeTimerID);
+
+// setMaybeTimerID :: Maybe -> IO(undefined)
+const setMaybeTimerID = m => new IO(() => maybeTimerID = m);
 
 const routes = [{
         'method': 'get', 
         'url': '/', 
-        'handler': (req, res, next) => { json(res, {'msg': 'Hello, Again'}).unsafePerformIO(); }
+        'io_handler': res2FullIO(
+            json({'msg': 'Hello, Again'})
+        )
     }, {
         'method': 'get',
         'url': '/start',
-        'handler': (req, res, next) => {
-            maybeTimerID = start(loop)(maybeTimerID).unsafePerformIO();
-            json(res, {'msg': 'The loop started.'}).unsafePerformIO();
-        }
+        'io_handler': res2FullIO(_.compose(
+            _.chain(setMaybeTimerID),
+            _.chain(() => getMaybeTimerID().map(start).ap(io_loop).join()),
+            json({'msg': 'Started'})
+        ))
     }, {
         'method': 'get',
         'url': '/stop',
-        'handler': (req, res, next) => {
-            maybeTimerID = stop(maybeTimerID).unsafePerformIO();
-            json(res, {'msg': 'Stop'}).unsafePerformIO();
-        }
+        'io_handler': res2FullIO(_.compose(
+            _.chain(setMaybeTimerID),
+            _.chain(() => getMaybeTimerID().chain(stop)),
+            json({'msg': 'Stopped'})
+        ))
     }
 ];
+
+// io_app :: IO Express
+const io_app = IO.of(express());
+
+// port :: Number
+const port = 3000;
+
+// io_init :: IO(() -> undefined)
+const io_init = closureIO(tools.print(`Express is listening on ${ port }`));
+
+// io_runApp :: IO Express
+const io_run_app = io_app.chain(app => io_init.chain(runApp(app)(port)(routes)));
 
 // Impure Code
 // ====================
 
-const app = express();
-
-runApp(app, 3000, () => {
-     tools.print('Express is listening on 3000').unsafePerformIO();
-})(routes).unsafePerformIO();
-
+// do
+io_run_app.unsafePerformIO();
